@@ -1,4 +1,6 @@
+#include <EEPROM.h>
 #include "game.hpp"
+
 
 using device::display;
 using device::buttons;
@@ -29,20 +31,24 @@ void MindGymGame::gameOver() {
     new_game = true;
     max_score = max(max_score, cursor);
 
+    EEPROM.write(0, max_score);
+
     uint8_t game_over_str[]{ _G, _A, _N, _N, _E, 0, _E, _n, _d };
     display.runningString(game_over_str, sizeof(game_over_str), RUN_STRING_SPEED);
-    display.point(true);
-    display.displayClock(max_score, cursor);
+
+    display.displayInt(max_score);
     delay(GAMEOVER_SCORE_DISPLAT_TIMEOUT);
-    display.point(false);
+    display.displayInt(cursor);
+    delay(GAMEOVER_SCORE_DISPLAT_TIMEOUT);
 }
 
 void MindGymGame::begin() {
     new_game = false;
     cursor = 0;
     device::initRandom();
-
     for (int8_t& x : steps) x = random() & 0b11;
+
+    max_score = EEPROM.read(0);
 
     uint8_t press_any_button[]{ _P, _r, _E, _S, _S, 0, _A, _n, _y, 0, _B, _u, _t, _t, _o, _n };
     display.runningString(press_any_button, sizeof(press_any_button), RUN_STRING_SPEED);
