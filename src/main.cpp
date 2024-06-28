@@ -2,11 +2,10 @@
 #include <GyverTM1637.h>
 #include "ledbutton.hpp"
 
+#define MAX_STEPS 128
 
-#define MAX_STEPS 64
-
-uint8_t steps[MAX_STEPS];
-uint8_t last_step = 0;
+int8_t steps[MAX_STEPS];
+uint8_t cursor = 0;
 
 #define PIN_TM1637_CLK A5
 #define PIN_TM1637_DIO A4
@@ -14,92 +13,111 @@ uint8_t last_step = 0;
 GyverTM1637 disp(PIN_TM1637_CLK, PIN_TM1637_DIO);
 
 LedButton buttons[] = {
-  LedButton(2, 3),
-  LedButton(4, 5),
-  LedButton(7, 6),
-  LedButton(9, 8),
+    LedButton(2, 3),
+    LedButton(4, 5),
+    LedButton(7, 6),
+    LedButton(9, 8),
 };
 
 #define RANDOM_ITERATIONS 8
 
-uint32_t myinitRandomSeed(uint32_t offset) {
-  for (uint8_t i = 0; i < RANDOM_ITERATIONS; i++) {
+void customRandomInit() {
+  uint32_t offset = micros();
+
+  for (uint8_t i = 0; i < RANDOM_ITERATIONS; i++)
     offset += (analogRead(A0) & 0b11) << i;
+
+  randomSeed(offset);
+
+  for (uint8_t i = 0; i < MAX_STEPS; i++) {
+    steps[i] = random() & 0b11;
   }
-  return offset;
 }
 
-bool anyPressed() {
-  for (LedButton& b : buttons) if (b.read()) return true;
-  return false;
+#define ON_BLINK_PERIOD 80
+
+int8_t getPressedIndex() {
+  for (int8_t ret = 0; ret < 4; ret++) {
+    LedButton& b = buttons[ret];
+    b.tick();
+
+    if (b.click())
+      return ret;
+  }
+  return -1;
 }
 
-void test() {
+void onStart() {
+  Serial.begin(9600);
+
+  disp.clear();
+  disp.brightness(7);
+
   disp.displayByte(0xFF, 0xFF, 0xFF, 0xFF);
 
-  for (LedButton& b : buttons)  b.setLed(true);
-  delay(500);
-  for (LedButton& b : buttons) b.setLed(false);
+  for (LedButton& b : buttons)
+    b.setLed(true);
+  
+  delay(200);
+
+  for (LedButton& b : buttons)
+    b.setLed(false);
 }
 
-#define STEPS_PLAY_TIMEOUT_MS 200
+#define STEPS_PLAY_TIMEOUT_MS 400
 
-void playSteps() {
-  for (uint8_t i = 0; i <= last_step; i++) {
-    disp.displayInt(i);
+void stepsPlay() {
+  for (uint8_t i = 0; i <= cursor; i++) {
     LedButton& b = buttons[steps[i]];
+
+    disp.displayInt(i);
     b.setLed(true);
     delay(STEPS_PLAY_TIMEOUT_MS);
+
     b.setLed(false);
     delay(STEPS_PLAY_TIMEOUT_MS);
   }
 }
 
-void appendStep() {
-  steps[last_step++] = random() & 0b11;
+int8_t waitUserInput() {
+  int8_t ret;
+
+  while (true) {
+    disp.displayByte(_P, _i, _n, _G);
+
+    ret = getPressedIndex();
+
+    if (ret != -1)
+      return ret;
+  }
+
+  return ret;
+}
+
+bool stepsRepeatCheck() {
+  for (uint8_t i = 0; i <= cursor; i++) {
+    if (steps[i] != waitUserInput())
+      return false;
+  }
+  return true;
 }
 
 void setup() {
-  disp.clear();
-  disp.brightness(7);
+  onStart();
 
-  test();
+  waitUserInput();
+  customRandomInit();
 
   delay(1000);
-
-  uint8_t str[]{
-    TM1637_letters::_H,
-    TM1637_letters::_O,
-    TM1637_letters::_L,
-    TM1637_letters::_D,
-    0,
-    TM1637_letters::_A,
-    TM1637_letters::_n,
-    TM1637_letters::_y,
-    0,
-    TM1637_letters::_b,
-    TM1637_letters::_u,
-    TM1637_letters::_t,
-    TM1637_letters::_t,
-    TM1637_letters::_o,
-    TM1637_letters::_n,
-  };
-
-  while (!anyPressed()) {
-    disp.runningString(str, sizeof(str), 160);
-  }
-
-  uint32_t seed = myinitRandomSeed(micros());
-  disp.displayInt(seed & 0xFFF);
-  randomSeed(seed);
 }
 
 void loop() {
+  stepsPlay();
 
-  playSteps();
-  appendStep();
-  delay(1000);
+  if (!stepsRepeatCheck()) {
+    disp.displayByte(_E, _N, _D, 0);
+    exit(0);
+  }
 
-
-
+  cursor++;
 }
