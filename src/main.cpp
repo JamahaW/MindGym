@@ -1,239 +1,105 @@
 #include <Arduino.h>
 #include <GyverTM1637.h>
+#include "ledbutton.hpp"
 
 
-#define CLK A5
-#define DIO A4
+#define MAX_STEPS 64
 
-GyverTM1637 disp(CLK, DIO);
+uint8_t steps[MAX_STEPS];
+uint8_t last_step = 0;
 
-uint32_t Now, clocktimer;
-boolean flag;
+#define PIN_TM1637_CLK A5
+#define PIN_TM1637_DIO A4
+
+GyverTM1637 disp(PIN_TM1637_CLK, PIN_TM1637_DIO);
+
+LedButton buttons[] = {
+  LedButton(2, 3),
+  LedButton(4, 5),
+  LedButton(7, 6),
+  LedButton(9, 8),
+};
+
+#define RANDOM_ITERATIONS 8
+
+uint32_t myinitRandomSeed(uint32_t offset) {
+  for (uint8_t i = 0; i < RANDOM_ITERATIONS; i++) {
+    offset += (analogRead(A0) & 0b11) << i;
+  }
+  return offset;
+}
+
+bool anyPressed() {
+  for (LedButton& b : buttons) if (b.read()) return true;
+  return false;
+}
+
+void test() {
+  disp.displayByte(0xFF, 0xFF, 0xFF, 0xFF);
+
+  for (LedButton& b : buttons)  b.setLed(true);
+  delay(500);
+  for (LedButton& b : buttons) b.setLed(false);
+}
+
+#define STEPS_PLAY_TIMEOUT_MS 200
+
+void playSteps() {
+  for (uint8_t i = 0; i <= last_step; i++) {
+    disp.displayInt(i);
+    LedButton& b = buttons[steps[i]];
+    b.setLed(true);
+    delay(STEPS_PLAY_TIMEOUT_MS);
+    b.setLed(false);
+    delay(STEPS_PLAY_TIMEOUT_MS);
+  }
+}
+
+void appendStep() {
+  steps[last_step++] = random() & 0b11;
+}
 
 void setup() {
-  Serial.begin(9600);
   disp.clear();
-  disp.brightness(7);  // яркость, 0 - 7 (минимум - максимум)
+  disp.brightness(7);
 
-}
+  test();
 
-
-
-void twists() {
-  // скручивание массив ЦИФР
-  byte digs[4] = { 3, 5, 7, 1 };
-  disp.twist(digs, 50);     // скорость прокрутки 100
   delay(1000);
 
-  // скручивание прицельно (ячейка, БАЙТ, скорость)
-  disp.twistByte(0, _1, 50);
-  delay(1000);
-
-  // скручивание прицельно (ячейка, ЦИФРА, скорость)
-  disp.twist(0, 8, 70);
-  delay(1000);
-
-  disp.clear();
-  delay(200);
-  for (byte i = 0; i < 10; i++) {
-    disp.twist(3, i, 20);
-    delay(200);
-  }
-
-  // скручивание массива БАЙТ
-  byte troll[4] = { _t, _r, _o, _l };
-  disp.twistByte(troll, 50);
-  delay(1000);
-
-  // прицельное скручивание БАЙТА (ячейка, байт, скорость)
-  disp.twistByte(2, _G, 50);
-  delay(1000);
-}
-
-void twistClock() {
-  byte hrs = 21, mins = 55;
-  uint32_t tmr;
-  Now = millis();
-  while (millis() - Now < 10000) {   // каждые 10 секунд
-    if (millis() - tmr > 500) {       // каждые полсекунды
-      tmr = millis();
-      flag = !flag;
-      disp.point(flag);   // выкл/выкл точки
-
-      if (flag) {
-        // ***** часы! ****
-        mins++;
-        if (mins > 59) {
-          mins = 0;
-          hrs++;
-          if (hrs > 24) hrs = 0;
-        }
-        // ***** часы! ****
-        disp.displayClockTwist(hrs, mins, 35);    // выводим время
-      }
-    }
-  }
-  disp.point(0);   // выкл точки
-}
-
-void scrolls() {
-  // прокрутка массив ЦИФР
-  byte digs[4] = { 3, 5, 7, 1 };
-  disp.scroll(digs, 100);     // скорость прокрутки 100
-  delay(1000);
-
-  // прокрутка прицельно (ячейка, ЦИФРА, скорость)
-  disp.scroll(0, 8, 200);
-  delay(1000);
-
-  disp.clear();
-  delay(1000);
-  for (byte i = 0; i < 10; i++) {
-    disp.scroll(3, i, 50);
-    delay(400);
-  }
-
-  // прокрутка массива БАЙТ
-  byte troll[4] = { _t, _r, _o, _l };
-  disp.scrollByte(troll, 100);
-  delay(1000);
-
-  // прицельная прокрутка БАЙТА (ячейка, байт, скорость)
-  disp.scrollByte(2, _G, 50);
-  delay(1000);
-}
-
-void bytes() {
-  // выводим байты из массива
-  byte troll[4] = { _t, _r, _o, _l };
-  disp.displayByte(troll);
-  delay(1000);
-
-  // выводим байты напрямую (4 в скобках)
-  disp.displayByte(_L, _O, _L, _empty);
-  delay(1000);
-
-  // выводим байты "прицельно"
-  disp.displayByte(3, _O);    // 3 ячейка, буква О
-  delay(1000);
-
-  // выводим цифры из массива
-  byte hell[4] = { 6, 6, 6, 6 };
-  disp.display(hell);
-  delay(1000);
-
-  // выводим цифры напрямую (4 в скобках)
-  disp.display(1, 2, 3, 4);
-  delay(1000);
-
-  // выводим цифры "прицельно"
-  disp.display(0, 9);    // 0 ячейка, цифра 9
-  delay(1000);
-}
-
-void fadeBlink() {
-  // пишем HELL
-  disp.displayByte(_H, _E, _L, _L);
-
-  Now = millis();
-  while (millis() - Now < 3000) {    // 3 секунды
-    for (int i = 7; i > 0; i--) {
-      disp.brightness(i);   // меняем яркость
-      delay(40);
-    }
-    for (int i = 0; i < 8; i++) {
-      disp.brightness(i);   // меняем яркость
-      delay(40);
-    }
-  }
-}
-
-void scrollClock() {
-  byte hrs = 15, mins = 0;
-  uint32_t tmr;
-  Now = millis();
-  while (millis() - Now < 10000) {   // каждые 10 секунд
-    if (millis() - tmr > 500) {       // каждые полсекунды
-      tmr = millis();
-      flag = !flag;
-      disp.point(flag);   // выкл/выкл точки
-
-      if (flag) {
-        // ***** часы! ****
-        mins++;
-        if (mins > 59) {
-          mins = 0;
-          hrs++;
-          if (hrs > 24) hrs = 0;
-        }
-        // ***** часы! ****
-        disp.displayClockScroll(hrs, mins, 70);    // выводим время
-      }
-    }
-  }
-  disp.point(0);   // выкл точки
-}
-
-void normClock() {
-  byte hrs = 15, mins = 0;
-  uint32_t tmr;
-  Now = millis();
-  while (millis() - Now < 10000) {   // каждые 10 секунд
-    if (millis() - tmr > 500) {       // каждые полсекунды
-      tmr = millis();
-      flag = !flag;
-      disp.point(flag);   // выкл/выкл точки
-
-      // ***** часы! ****
-      mins++;
-      if (mins > 59) {
-        mins = 0;
-        hrs++;
-        if (hrs > 24) hrs = 0;
-      }
-      // ***** часы! ****
-      disp.displayClock(hrs, mins);   // выводим время функцией часов
-    }
-  }
-  disp.point(0);   // выкл точки
-}
-
-void ints() {
-  // тупо отправляем цифры
-  disp.displayInt(-999);
-  delay(500);
-  disp.displayInt(-99);
-  delay(500);
-  disp.displayInt(-9);
-  delay(500);
-  disp.displayInt(0);
-  delay(500);
-  disp.displayInt(6);
-  delay(500);
-  disp.displayInt(66);
-  delay(500);
-  disp.displayInt(666);
-  delay(500);
-  disp.displayInt(6666);
-  delay(500);
-}
-
-void runningText() {
-  byte welcome_banner[] = { _H, _E, _L, _L, _O, _empty, _empty,
-                           _e, _n, _j, _o, _y, _empty, _empty,
-                           _1, _6, _3, _7, _empty, _d, _i, _S, _P, _l, _a, _y
+  uint8_t str[]{
+    TM1637_letters::_H,
+    TM1637_letters::_O,
+    TM1637_letters::_L,
+    TM1637_letters::_D,
+    0,
+    TM1637_letters::_A,
+    TM1637_letters::_n,
+    TM1637_letters::_y,
+    0,
+    TM1637_letters::_b,
+    TM1637_letters::_u,
+    TM1637_letters::_t,
+    TM1637_letters::_t,
+    TM1637_letters::_o,
+    TM1637_letters::_n,
   };
-  disp.runningString(welcome_banner, sizeof(welcome_banner), 200);  // 200 это время в миллисекундах!
+
+  while (!anyPressed()) {
+    disp.runningString(str, sizeof(str), 160);
+  }
+
+  uint32_t seed = myinitRandomSeed(micros());
+  disp.displayInt(seed & 0xFFF);
+  randomSeed(seed);
 }
 
 void loop() {
-  runningText();
-  scrolls();
-  scrollClock();
-  twists();
-  twistClock();
-  ints();
-  bytes();
-  fadeBlink();
-  normClock();
+
+  playSteps();
+  appendStep();
+  delay(1000);
+
+
+
 }
