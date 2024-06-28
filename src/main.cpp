@@ -47,7 +47,7 @@ int8_t getPressedIndex() {
   return -1;
 }
 
-void onStart() {
+void onStartup() {
   Serial.begin(9600);
 
   disp.clear();
@@ -103,7 +103,7 @@ bool stepsRepeatCheck() {
 }
 
 void setup() {
-  onStart();
+  onStartup();
 
   waitUserInput();
   customRandomInit();
