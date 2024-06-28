@@ -10,9 +10,6 @@ class LedButton : public Button {
     /// @brief цифровой пин светодиода
     const uint8_t PIN_LED;
 
-    /// @brief Текущее состояние
-    mutable bool led_state = false;
-
     public:
 
     /// @brief Кнопка с светодиодом
@@ -24,8 +21,5 @@ class LedButton : public Button {
 
     /// @brief Установить состояние светодиода
     /// @param state false - выкл, true - вкл
-    void setLed(bool state) const { digitalWrite(PIN_LED, led_state = state); }
-
-    /// @brief Переключить состояние светодиода
-    void toggleLed() const { setLed(!led_state); }
+    void setLed(bool state) const { digitalWrite(PIN_LED, state); }
 };
